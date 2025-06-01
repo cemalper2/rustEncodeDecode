@@ -1,11 +1,6 @@
 pub mod base32 {
-    use bincode::{self, Error};
-    use bitvec::prelude::*;
-    use log;
-    use phf::phf_map;
-    use serde::Serialize;
+    use crate::base_mod::{BitGroupedDecoding, BitGroupedEncoding, MyError};
     use std::fmt::Display;
-    use crate::base_mod::{Decodable, Encodable, MyError};
 
     macro_rules! phf_zip_map {
         ([$($k:expr),*], [$($v:expr),*]) => {
@@ -20,11 +15,11 @@ pub mod base32 {
         [
             'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
             'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7'
-            ],
+        ],
         [
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
             24, 25, 26, 27, 28, 29, 30, 31
-            ]
+        ]
     );
 
     const CHUNK_SIZE: usize = 5;
@@ -32,33 +27,39 @@ pub mod base32 {
 
     const ENCODE_TABLE: [char; 32] = [
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
-        'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7'];
+        'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7',
+    ];
 
     #[derive(Debug, Default)]
     pub struct Base32 {
         container: String,
     }
 
+    impl Base32 {}
 
-    impl Base32 {
-      
-    }
-
-
-    impl Encodable for Base32 {
-        fn new() -> Self where Self: Sized {
+    impl BitGroupedEncoding for Base32 {
+        fn new() -> Self
+        where
+            Self: Sized,
+        {
             return Self {
                 container: (String::new()),
-            };        
+            };
         }
-    
-        fn append(&mut self, to_add: char) -> Result<(), MyError> where Self: Sized {
+
+        fn append(&mut self, to_add: char) -> Result<(), MyError>
+        where
+            Self: Sized,
+        {
             assert!(ENCODE_TABLE.contains(&to_add));
             self.container.push(to_add);
             return Ok(());
         }
-    
-        fn pad(&mut self) -> () where Self: Sized {
+
+        fn pad(&mut self) -> ()
+        where
+            Self: Sized,
+        {
             if self.container.len() == 0 {
                 return;
             }
@@ -70,17 +71,23 @@ pub mod base32 {
                 _ => {}
             }
         }
-    
-        fn get_chunk_size() -> usize where Self: Sized {
-            return CHUNK_SIZE
+
+        fn get_chunk_size() -> usize
+        where
+            Self: Sized,
+        {
+            return CHUNK_SIZE;
         }
-    
-        fn get_encode_table() -> &'static [char] where Self: Sized {
+
+        fn get_encode_table() -> &'static [char]
+        where
+            Self: Sized,
+        {
             return &ENCODE_TABLE;
         }
     }
 
-            impl Decodable for Base32 {
+    impl BitGroupedDecoding for Base32 {
         fn get_container(&self) -> &String {
             return &self.container;
         }
@@ -94,7 +101,6 @@ pub mod base32 {
             return BYTE_SIZE;
         }
     }
-
 
     impl Display for Base32 {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -114,13 +120,7 @@ pub mod base32 {
         #[test]
         fn test_printout() {
             let x = b"a213f444vfvdfvdvdscvdf34r023";
-            let y = [0xfffffff, 0xfffffff, 4, 5243243, 65];
-            let hede_str = TestStruct {
-                a: 0xfffffff,
-                b: "ZZZZZZ".to_string(),
-            };
             println!("encoded x {:}", Base32::encode(&x).unwrap());
-            println!("hede {:}", Base32::encode_serialize(&hede_str).unwrap());
             println!(
                 "decode x {:?}",
                 Base32::encode(&x).unwrap().decode().unwrap().as_slice()
@@ -132,9 +132,11 @@ pub mod base32 {
             let test_vector: Vec<(&[u8], &str)> = vec![
                 (b"rust", "OJ2XG5A="),
                 (b"hello world", "NBSWY3DPEB3W64TMMQ======"),
-                (b"hello world", "NBSWY3DPEB3W64TMMQ======"),
                 (b"hello worldrst", "NBSWY3DPEB3W64TMMRZHG5A="),
-                (b"423refdscfcXsdqhello world", "GQZDG4TFMZSHGY3GMNMHGZDRNBSWY3DPEB3W64TMMQ======"),
+                (
+                    b"423refdscfcXsdqhello world",
+                    "GQZDG4TFMZSHGY3GMNMHGZDRNBSWY3DPEB3W64TMMQ======",
+                ),
             ];
             for (input, expected) in test_vector {
                 let encoded = Base32::encode(&input).unwrap();
@@ -142,18 +144,6 @@ pub mod base32 {
                 let decoded = encoded.decode().unwrap();
                 assert_eq!(decoded.as_slice(), input);
             }
-        }
-
-        #[test]
-        fn test_base32_encode_decode_struct() {
-            let input = TestStruct {
-                a: 42,
-                b: "test".to_string(),
-            };
-            let encoded = Base32::encode_serialize(&input).unwrap();
-            let decoded: Vec<u8> = encoded.decode().unwrap();
-            let deserialized: TestStruct = bincode::deserialize(&decoded).unwrap();
-            assert_eq!(deserialized, input);
         }
 
         #[test]
@@ -179,6 +169,4 @@ pub mod base32 {
             assert!(decoded.is_empty());
         }
     }
-
-
 }
