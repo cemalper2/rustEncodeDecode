@@ -1,7 +1,8 @@
 pub mod base85 {
-    use crate::base_mod::MyError;
+    use crate::base_mod::EncodeError;
     use bincode::{self, Error};
-    use std::{fmt::Display, io::Write};
+    use log::{info};
+    use std::{fmt::Display};
 
     #[derive(Debug, Default)]
     pub struct Base85 {
@@ -14,7 +15,7 @@ pub mod base85 {
             };
         }
 
-        fn encode<T: AsRef<[u8]>>(bytes: &T) -> Result<Self, Error> {
+        pub fn encode<T: AsRef<[u8]>>(bytes: &T) -> Result<Self, Error> {
             let data = bytes.as_ref();
             let mut buffer: u32;
             let mut result = Self::new();
@@ -57,23 +58,47 @@ pub mod base85 {
 
             Ok(result)
         }
-        pub fn decode(&self) -> Result<Vec<u8>, MyError> {
+        pub fn decode(&self) -> Result<Vec<u8>, EncodeError> {
             let mut to_ret: Vec<u8> = vec![];
-            for chunk in self.container.as_bytes().chunks(5) {
-                let mut chunk_vec = chunk.to_vec();
+            let mut chunk_vec: Vec<u8> = vec![];
+
+            fn decode_chunk(chunk_vec: &mut Vec<u8>) -> Vec<u8> {
+                let mut decoded_int_vec: Vec<u8>;
+                let mut decoded_int = 0_u32;
+                let mut pad_length: usize = 0;
                 while chunk_vec.len() < 5 {
                     chunk_vec.push(b'u');
+                    pad_length += 1;
                 }
-                let mut decoded_int = 0_u32;
                 for (index, digit) in chunk_vec.iter().enumerate() {
                     decoded_int += (digit - 33) as u32 * 85_u32.pow(4 - index as u32);
                 }
-                let mut decoded_int_vec = decoded_int.to_be_bytes().to_vec();
-                if chunk.len() < 5 {
-                    let len_diff = 5 - chunk.len();
-                    decoded_int_vec.truncate(4 - len_diff);
+                info!("Decoded int: {decoded_int}");
+                decoded_int_vec = decoded_int.to_be_bytes().to_vec();
+                if pad_length > 0 {
+                    decoded_int_vec.truncate(4 - pad_length);
                 }
-                to_ret.append(&mut decoded_int_vec);
+                decoded_int_vec
+            }
+
+            for character in self.container.chars() {
+                if character as char == 'z' {
+                    if !chunk_vec.is_empty() {
+                        return Err(EncodeError::DecodingError {});
+                    }
+                    let mut decoded_int_vec = (0 as u32).to_be_bytes().to_vec();
+                    to_ret.append(&mut decoded_int_vec); //4-byte 0s
+                    continue;
+                }
+                chunk_vec.push(character as u8);
+                if chunk_vec.len() == 5 {
+                    to_ret.append(&mut decode_chunk(&mut chunk_vec));
+                    chunk_vec.clear();
+                }
+            }
+
+            if chunk_vec.len() > 0 {
+                to_ret.append(&mut decode_chunk(&mut chunk_vec));
             }
             return Ok(to_ret);
         }
@@ -100,7 +125,7 @@ pub mod base85 {
             assert_eq!(b1.container, b2.container);
         }
         #[test]
-        fn test_base85_encode() {
+        fn test_base85_encode_decode() {
             let test_vector: Vec<(&[u8], &str)> = vec![
                 (b"hello world", "BOu!rD]j7BEbo7"),
                 (b"Base85 encoding", "6=FqH3&MgiDI[TqBl7P"),
@@ -109,9 +134,9 @@ pub mod base85 {
                 (b"Base8512", "6=FqH3&NEG"),
                 (b"3", "1B"),
                 (b"", ""),
-                (&[0xFF as u8;7], "s8W-!s8W*"),
+                (&[0xFF as u8; 7], "s8W-!s8W*"),
                 (&[0x00, 0x01, 0x41, 0xFF], "!!,Cc"),
-                (&[0x00, 0x01, 0x41, 0xFF, 0x00], "!!,Ccz"),
+                (&[0x00, 0x01, 0x41, 0xFF, 0x00, 0x00, 0x00, 0x00], "!!,Ccz"),
                 (
                     &[
                         0x00, 0x01, 0x41, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x32,
@@ -123,7 +148,8 @@ pub mod base85 {
             for (input, expected) in test_vector {
                 let encoded = Base85::encode(&input).unwrap();
                 println!("Expected: {}, Encoded: {}", expected, encoded.container);
-                assert_eq!(encoded.container, expected);
+                let decoded = encoded.decode().unwrap();
+                assert_eq!(input, decoded);
             }
         }
         #[test]
@@ -136,10 +162,17 @@ pub mod base85 {
                     "k44rfYXCfd",
                     &[0xe6, 0xf2, 0x9a, 0x26, 0xb0, 0x44, 0x42, 0x61],
                 ),
-                ("6=FqH3&L",b"Base85"),
+                ("6=FqH3&L", b"Base85"),
                 ("3&L", b"85"),
-                ("s8W-!s8W*", &[0xFF as u8;7]),
-
+                ("s8W-!s8W*", &[0xFF as u8; 7]),
+                (
+                    "!!,Ccz!!!We6Ql",
+                    &[
+                        0x00, 0x01, 0x41, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x32,
+                        0x43, 0x21,
+                    ],
+                ),
+                ("!!,Ccz", &[0x00, 0x01, 0x41, 0xFF, 0x00, 0x00, 0x00, 0x00]),
             ];
             for (input, expected) in test_vector {
                 let mut encoded = Base85::new();

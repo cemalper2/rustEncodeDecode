@@ -1,5 +1,5 @@
 pub mod base32 {
-    use crate::base_mod::{BitGroupedDecoding, BitGroupedEncoding, MyError};
+    use crate::base_mod::{BitGroupedDecoding, BitGroupedEncoding, EncodeError};
     use std::fmt::Display;
 
     macro_rules! phf_zip_map {
@@ -47,7 +47,7 @@ pub mod base32 {
             };
         }
 
-        fn append(&mut self, to_add: char) -> Result<(), MyError>
+        fn append(&mut self, to_add: char) -> Result<(), EncodeError>
         where
             Self: Sized,
         {

@@ -3,19 +3,37 @@ pub mod base64;
 pub mod base85;
 
 pub mod base_mod {
+    use std::fmt;
+
     use bincode::{self, Error};
     use bitvec::{field::BitField, order::Msb0, vec::BitVec};
+    use std::error::Error as StdError;
+
     #[derive(Debug)]
-    pub enum MyError {
-        OutOfBounds {},
-        DecodingError {}, // other error variants...
+    pub enum EncodeError {
+        InvalidInputLength,
+        InternalOverflow,
+        DecodingError,
     }
+    impl fmt::Display for EncodeError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                EncodeError::InvalidInputLength => write!(f, "Input length is invalid."),
+                EncodeError::InternalOverflow => {
+                    write!(f, "Internal buffer overflow during encoding.")
+                }
+                EncodeError::DecodingError => write!(f, "Decoding error."),
+            }
+        }
+    }
+
+    impl StdError for EncodeError {}
 
     /// A trait for types that can be encoded using a custom encoding scheme.
     ///
     /// # Required Methods
     /// - `new() -> Self`: Constructs a new instance of the implementing type.
-    /// - `append(&mut self, to_add: char) -> Result<(), MyError>`: Appends a character to the encoded output.
+    /// - `append(&mut self, to_add: char) -> Result<(), EncodeError>`: Appends a character to the encoded output.
     /// - `pad(&mut self)`: Pads the encoded output as necessary to meet encoding requirements.
     /// - `get_chunk_size() -> usize`: Returns the number of bits per encoding chunk.
     /// - `get_encode_table() -> &'static [char]`: Returns the encoding table used for mapping values to characters.
@@ -36,7 +54,7 @@ pub mod base_mod {
         where
             Self: Sized;
 
-        fn append(&mut self, to_add: char) -> Result<(), MyError>
+        fn append(&mut self, to_add: char) -> Result<(), EncodeError>
         where
             Self: Sized;
 
@@ -79,7 +97,7 @@ pub mod base_mod {
         fn get_decode_table() -> &'static phf::Map<char, u8>;
         fn get_chunk_size() -> usize;
         fn get_byte_size() -> usize;
-        fn decode(&self) -> Result<Vec<u8>, MyError> {
+        fn decode(&self) -> Result<Vec<u8>, EncodeError> {
             let mut to_ret: Vec<u8> = vec![];
             let mut bits: BitVec<u8, Msb0> = BitVec::new();
             let decode_table = Self::get_decode_table();
@@ -97,7 +115,7 @@ pub mod base_mod {
                     }
                     None => {
                         log::warn!("Tried to decode invalid symbol: {}", symbol);
-                        return Err(MyError::DecodingError {});
+                        return Err(EncodeError::DecodingError {});
                     }
                 }
             }

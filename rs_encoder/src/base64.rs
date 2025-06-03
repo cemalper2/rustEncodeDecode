@@ -2,7 +2,7 @@ pub mod base64 {
 
     use std::fmt::Display;
 
-    use crate::base_mod::{BitGroupedDecoding, BitGroupedEncoding, MyError};
+    use crate::base_mod::{BitGroupedDecoding, BitGroupedEncoding, EncodeError};
 
     macro_rules! phf_zip_map {
     ([$($k:expr),*], [$($v:expr),*]) => {
@@ -52,7 +52,7 @@ pub mod base64 {
             };
         }
 
-        fn append(&mut self, to_add: char) -> Result<(), MyError>
+        fn append(&mut self, to_add: char) -> Result<(), EncodeError>
         where
             Self: Sized,
         {
