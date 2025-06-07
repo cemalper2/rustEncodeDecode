@@ -1,3 +1,31 @@
+//! Provides Base85 encoding and decoding functionality.
+//!
+//! # Overview
+//! This module implements Base85 encoding and decoding for arbitrary byte slices. It provides a `Base85` struct that can encode data into a Base85 string and decode it back to bytes.
+//!
+//! # Features
+//! - Encode any byte slice into a Base85 string representation.
+//! - Decode a Base85 string back into the original bytes.
+//! - Handles padding and special zero encoding as per Base85 specification.
+//! - Implements `Display` for pretty-printing the encoded string.
+//!
+//! # Example
+//! ```rust
+//! use crate::base85::Base85;
+//!
+//! let data = b"hello world";
+//! let encoded = Base85::encode(&data).unwrap();
+//! println!("Encoded: {}", encoded);
+//! let decoded = encoded.decode().unwrap();
+//! assert_eq!(decoded, data);
+//! ```
+//!
+//! # Errors
+//! - Encoding returns a `bincode::Error` on failure.
+//! - Decoding returns a custom `EncodeError` if the input is invalid or cannot be decoded.
+//!
+//! # Tests
+//! This module includes unit tests for encoding and decoding various inputs, including edge cases and round-trip tests.
 pub mod base85 {
     use crate::base_mod::EncodeError;
     use bincode::{self, Error};
